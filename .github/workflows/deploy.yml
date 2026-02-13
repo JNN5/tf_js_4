@@ -24,14 +24,35 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@v1
         with:
-          bun-version: latest
+          bun-version: 1.1.45
+
+      - name: Configure DNS and Network
+        run: |
+          echo "nameserver 8.8.8.8" | sudo tee /etc/resolv.conf
+          echo "nameserver 8.8.4.4" | sudo tee -a /etc/resolv.conf
 
       - name: Install dependencies
-        run: bun install
+        env:
+          NPM_CONFIG_REGISTRY: https://registry.npmjs.org
+          BUN_CONFIG_REGISTRY: https://registry.npmjs.org
+          NODE_OPTIONS: --dns-result-order=ipv4first
+        run: |
+          for i in 1 2 3; do
+            echo "Attempt $i: Installing dependencies..."
+            if bun install --frozen-lockfile 2>&1; then
+              echo "Success on attempt $i"
+              exit 0
+            fi
+            echo "Attempt $i failed, waiting 5 seconds..."
+            sleep 5
+          done
+          echo "All attempts failed, trying with npm..."
+          npm ci
 
       - name: Build site
         env:
           BASE_URL: ${{ github.event.repository.name }}
+          NODE_OPTIONS: --dns-result-order=ipv4first
         run: bun run build --public-path=/${{ github.event.repository.name }}/
 
       - name: Setup Pages
