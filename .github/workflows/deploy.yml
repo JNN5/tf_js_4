@@ -30,24 +30,28 @@ jobs:
         run: |
           echo "nameserver 8.8.8.8" | sudo tee /etc/resolv.conf
           echo "nameserver 8.8.4.4" | sudo tee -a /etc/resolv.conf
+          # Disable IPv6
+          sudo sysctl -w net.ipv6.conf.all.disable_ipv6=1
+          sudo sysctl -w net.ipv6.conf.default.disable_ipv6=1
 
       - name: Install dependencies
         env:
-          NPM_CONFIG_REGISTRY: https://registry.npmjs.org
           BUN_CONFIG_REGISTRY: https://registry.npmjs.org
+          BUN_CONFIG_TIMEOUT: 60000
+          BUN_CONFIG_RETRY: 3
           NODE_OPTIONS: --dns-result-order=ipv4first
         run: |
           for i in 1 2 3; do
             echo "Attempt $i: Installing dependencies..."
-            if bun install --frozen-lockfile 2>&1; then
+            # Try without lockfile first, then with
+            if bun install --force 2>&1; then
               echo "Success on attempt $i"
               exit 0
             fi
-            echo "Attempt $i failed, waiting 5 seconds..."
-            sleep 5
+            echo "Attempt $i failed, waiting 10 seconds..."
+            sleep 10
           done
-          echo "All attempts failed, trying with npm..."
-          npm ci
+          exit 1
 
       - name: Build site
         env:
